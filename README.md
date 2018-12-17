@@ -1,6 +1,16 @@
 # AWS_Flowlog_Graph
 simple script that reads AWS VPC Flowlogs and generate a connection graph representing TCP traffic flow.
 
+Discription
+-------------
+
+Data can be downloaded or read direcly from Clowd watch
+
+Tagging and other identifing  infomation is queried directly from AWS 
+
+By default inbound connection to ELBs are ignored, as are unlabled outbound connection
+(this can be changed in settings)
+
 
 Output Exaples
 -------------
