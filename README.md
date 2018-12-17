@@ -9,7 +9,7 @@ A Directed Graph
 
 <img src='https://raw.githubusercontent.com/evilpete/AWS_Flowlog_Graph/master/Example_Output/xvlog-dot.png' width=700 title='Directed Graph'>
 
-As a Undirected Graph
+As an Undirected Graph
 
 <img src='https://raw.githubusercontent.com/evilpete/AWS_Flowlog_Graph/master/Example_Output/xvlog-fdp.png' width=700 title='Undirected Graph'>
 
