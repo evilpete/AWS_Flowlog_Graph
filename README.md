@@ -15,4 +15,4 @@ As a Undirected Graph
 
 Undirected Graph (Alt)
 
-<img src='https://raw.githubusercontent.com/evilpete/AWS_Flowlog_Graph/master/Example_Output/xvlog-neato.png' width=6000 title='Undirected Graph'>
+<img src='https://raw.githubusercontent.com/evilpete/AWS_Flowlog_Graph/master/Example_Output/xvlog-neato.png' width=600 title='Undirected Graph'>
