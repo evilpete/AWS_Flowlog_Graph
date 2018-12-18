@@ -12,7 +12,7 @@ By default inbound connection to ELBs are ignored, as are unlabled outbound conn
 (this can be changed in settings)
 
 
-Output Exaples
+Output Examples
 -------------
 
 A Directed Graph
