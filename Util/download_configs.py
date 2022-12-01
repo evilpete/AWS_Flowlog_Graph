@@ -7,12 +7,21 @@
 #
 #   To use:
 #
-#   edit values for 
+#   edit values for
 #       aws_vpc = 'vpc-XXXXXXXXXXXXXXXXX'
 #       aws_profile = 'default'
 #       aws_region = 'us-west-2'
 
 
+# describe_auto_scaling_groups describe_auto_scaling_instances describe_cache_clusters
+# describe_db_cluster_endpoints describe_db_instances describe_egress_only_internet_gateways
+# describe_endpoints describe_flow_logs describe_hosts describe_instances
+# describe_internet_gateways describe_listeners describe_load_balancer (elbv2)
+# describe_load_balancers describe_local_gateways describe_log_streams
+# describe_nat_gateways describe_network_interfaces describe_subnets
+# describe_target_groups describe_target_health describe_transit_gateways
+# describe_vpc_endpoint_connections describe_vpc_endpoints
+# # describe_file_systems describe_mount_targets
 
 
 # pylint: disable=invalid-name,missing-function-docstring,missing-class-docstring,missing-module-docstring
@@ -65,6 +74,7 @@ log_hours = 0
 log_minutes = 0 #60
 log_duration = int((3600 * 24 * log_days) + (3600 * log_hours) + (60 * log_minutes))
 
+# describe_load_balancers
 def get_elb(vpc_list):
     full_resp = []
     throttle = False
@@ -92,6 +102,7 @@ def get_elb(vpc_list):
 
     return full_resp
 
+# describe_load_balancer (elbv2)
 def get_elbv2(vpc_list):
     full_resp = []
     throttle = False
@@ -118,9 +129,9 @@ def get_elbv2(vpc_list):
 
     return full_resp
 
+# describe_listeners
 #        targ_grps_rep = elbv2_client.describe_target_groups(LoadBalancerArn=lb['LoadBalancerArn'])
 #        target_groups_by_elb[lb['LoadBalancerArn']] = listeners_rep['TargetGroups']
-
 def get_listeners(balv2_rep):
     full_resp = {}
     throttle = False
@@ -144,6 +155,7 @@ def get_listeners(balv2_rep):
     print("listeners", len(full_resp))
     return full_resp
 
+# describe_target_groups
 def get_target_groups(balv2_rep):
     full_resp = {}
     throttle = False
@@ -167,6 +179,7 @@ def get_target_groups(balv2_rep):
     #print("target_group", len(full_resp))
     return full_resp
 
+# describe_target_health
 def get_target_health(targ_groups_rep):
     full_resp = {}
     throttle = False
@@ -189,6 +202,7 @@ def get_target_health(targ_groups_rep):
     #print("target_group", len(full_resp))
     return full_resp
 
+# describe_instances
 def get_instances(ffilter=None):
     if ffilter is None:
         ffilter = []
@@ -234,7 +248,7 @@ def get_asg_resource(func, index, ffilter=None):
 
     return full_resp
 
-# list_functions Functions
+# list_functions Functions (lambda)
 def get_lambda_resource(func, index):
     full_resp = []
     throttle = False
@@ -253,10 +267,10 @@ def get_lambda_resource(func, index):
 
     return full_resp
 
-# "describe_network_interfaces", "NetworkInterfaces"
-# "describe_hosts", "Hosts"
-# "describe_subnets", "Subnets"
-# "describe_flow_logs", "FlowLogs"
+# describe_network_interfaces", "NetworkInterfaces"
+# describe_hosts", "Hosts"
+# describe_subnets", "Subnets"
+# describe_flow_logs", "FlowLogs"
 # describe-vpc-endpoints  VpcEndpoints
 # describe_internet_gateways InternetGateways
 def get_ec2_resource(func, index, ffilter=None):
@@ -279,7 +293,7 @@ def get_ec2_resource(func, index, ffilter=None):
     return full_resp
 
 
-# "describe_cache_clusters", "CacheClusters"
+# describe_cache_clusters", "CacheClusters"
 def get_elasticache_resource(func, index, ffilter=None):
     ffilter = ffilter or []
     full_resp = []
@@ -300,17 +314,19 @@ def get_elasticache_resource(func, index, ffilter=None):
     return full_resp
 
 # describe_endpoints Endpoints
-# def get_dynamodb_endpoints():
-#     full_resp = []
-#     resp = dynamodb_client.describe_endpoints()
-#     while resp:
-#         full_resp.extend(resp['Endpoints'])
-#
-#         if 'NextMarker' in resp:
-#             resp = dynamodb_client.describe_endpoints(Marker=resp['NextMarker'])
-#         else:
-#             break
-#     return full_resp
+def get_dynamodb_endpoints():
+    full_resp = []
+    resp = dynamodb_client.describe_endpoints()
+    while resp:
+        full_resp.extend(resp['Endpoints'])
+
+        if 'NextMarker' in resp:
+            resp = dynamodb_client.describe_endpoints(Marker=resp['NextMarker'])
+        else:
+            break
+    return full_resp
+
+
 
 def get_rds_resource(func, index, ffilter=None):
     ffilter = ffilter or []
@@ -331,6 +347,27 @@ def get_rds_resource(func, index, ffilter=None):
 
     return full_resp
 
+
+# describe_file_systems FileSystems
+# describe_mount_targets MountTargets
+def get_efs_resource(func, index):
+    # ffilter = ffilter or []
+    full_resp = []
+    throttle = False
+    paginator = efs_client.get_paginator(func)
+    response_iterator = paginator.paginate()   # Filters=ffilter)
+    for resp in response_iterator:
+
+        full_resp.extend(resp[index])
+
+        if resp.get('ResponseMetadata', {}).get('RetryAttempts', 0) > 0:
+            print("\tRetryAttempts:", resp['ResponseMetadata'].get('RetryAttempts', '?'))
+            throttle = True
+
+        if throttle:
+            time.sleep(0.2)
+
+    return full_resp
 
 # MasterRegion=aws_region
 # def _get_lambda_functions():
@@ -591,7 +628,10 @@ if __name__ == '__main__':
     rds_client = session.client('rds', config=boto_config)
     lambda_client = session.client('lambda', config=boto_config)
     elasticache_client = session.client('elasticache', config=boto_config)
+    # efs_client = session.client('efs', config=boto_config)
+    efs_client = None
     # dynamodb_client = session.client('dynamodb', config=boto_config)
+    dynamodb_client = None
 
 
     print("\nVpcs")
@@ -655,10 +695,11 @@ if __name__ == '__main__':
     print("TransitGateways", len(transit_gateways_rep))
     qdump('transit_gateways', transit_gateways_rep)
 
-#    print("\nDynamodb Endpoints")
-#    dynamodb_endpoints_rep = get_dynamodb_endpoints()
-#    print("dynamodb_endpoints", len(dynamodb_endpoints_rep))
-#    qdump('dynamodb_endpoints', dynamodb_endpoints_rep)
+    if dynamodb_client:
+        print("\nDynamodb Endpoints")
+        dynamodb_endpoints_rep = get_dynamodb_endpoints()
+        print("dynamodb_endpoints", len(dynamodb_endpoints_rep))
+        qdump('dynamodb_endpoints', dynamodb_endpoints_rep)
 
     print("\nLocalGateways")
     local_gateways_rep = get_ec2_resource("describe_local_gateways", "LocalGateways")
@@ -670,6 +711,7 @@ if __name__ == '__main__':
                                                             "LocalGatewayVirtualInterfaces")
     print("local_gateway_virtual_interfaces", len(local_gateway_virtual_interfaces_rep))
     qdump('local_gateway_virtual_interfaces', local_gateway_virtual_interfaces_rep)
+
 
     print("\nlambda-functions")
     lambda_funct_rep = get_lambda_resource("list_functions", "Functions")
@@ -684,22 +726,37 @@ if __name__ == '__main__':
     print('instances_rep', len(instances_rep))
     qdump('instances', instances_rep)
 
-    print("\nRds Instances")
-    rds_instances_rep = get_rds_resource("describe_db_instances", "DBInstances")
-    print('rds_instances_rep', len(rds_instances_rep))
-    qdump('rds_instances', rds_instances_rep)
+    if efs_client:
+        print("\nEFS FileSystems")
+        efs_filesystems_rep = get_efs_resource("describe_file_systems", "FileSystems")
+        print('efs_filesystems_rep', len(efs_filesystems_rep))
+        qdump('efs_filesystems', efs_filesystems_rep)
+
+        print("\nEFS MountTargets")
+        efs_mounttargets_rep = get_efs_resource("describe_file_systems", "MountTargets")
+        print('efs_mounttargets_rep', len(efs_mounttargets_rep))
+        qdump('efs_mountTargets', efs_mounttargets_rep)
+
+        # for MountTargetId in MountTargets
+        # EFS list_tags_for_resource  ResourceId
+
+    if rds_client:
+        print("\nRds Instances")
+        rds_instances_rep = get_rds_resource("describe_db_instances", "DBInstances")
+        print('rds_instances_rep', len(rds_instances_rep))
+        qdump('rds_instances', rds_instances_rep)
+
+        print("\nRds Cluster Endpoints")
+        rds_cluster_endpoints_rep = get_rds_resource("describe_db_cluster_endpoints", "DBClusterEndpoints")
+        print('rds_cluster_endpoints', len(rds_cluster_endpoints_rep))
+        qdump('rds_cluster_endpoints', rds_cluster_endpoints_rep)
 
 
-    print("\nRds Cluster Endpoints")
-    rds_cluster_endpoints_rep = get_rds_resource("describe_db_cluster_endpoints", "DBClusterEndpoints")
-    print('rds_cluster_endpoints', len(rds_cluster_endpoints_rep))
-    qdump('rds_cluster_endpoints', rds_cluster_endpoints_rep)
-
-
-    print("\nElasticache cache_clusters")
-    elasticache_cache_clusters_rep = get_elasticache_resource("describe_cache_clusters", "CacheClusters")
-    print('elasticache_cache_clusters', len(elasticache_cache_clusters_rep))
-    qdump('elasticache_cache_clusters', elasticache_cache_clusters_rep)
+    if elasticache_client:
+        print("\nElasticache cache_clusters")
+        elasticache_cache_clusters_rep = get_elasticache_resource("describe_cache_clusters", "CacheClusters")
+        print('elasticache_cache_clusters', len(elasticache_cache_clusters_rep))
+        qdump('elasticache_cache_clusters', elasticache_cache_clusters_rep)
 
     print("\nASG Instances")
     asg_instances_rep = get_asg_resource("describe_auto_scaling_instances", "AutoScalingInstances")
