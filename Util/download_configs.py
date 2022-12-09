@@ -387,7 +387,7 @@ def get_elbv2_resource(func, index, ffilter=None):
 def get_redshift_resource(func, index):
     full_resp = []
     throttle = False
-    paginator = rds_client.get_paginator(func)
+    paginator = redshift_client.get_paginator(func)
     response_iterator = paginator.paginate()
     for resp in response_iterator:
 
