@@ -46,7 +46,7 @@ skip_strm = 50
 
 no_vpc_filter = True
 
-aws_vpc = 'vpc-00000000000000001'
+aws_vpc = None
 aws_profile = 'default'
 aws_region = 'us-west-2'
 
@@ -90,7 +90,7 @@ def get_elb(vpc_list):
             elbs = resp['LoadBalancerDescriptions']
 
         full_resp.extend(elbs)
-        print("\t+get_elb", len(resp['LoadBalancerDescriptions']), len(elbs))
+        # print("\t+get_elb", len(resp['LoadBalancerDescriptions']), len(elbs))
 
         # if resp['ResponseMetadata']['RetryAttempts'] > 0:
         if resp.get('ResponseMetadata', {}).get('RetryAttempts', 0) > 0:
@@ -116,7 +116,7 @@ def get_elbv2(vpc_list):
         else:
             elbs = resp['LoadBalancers']
 
-        print("\t+get_elbv2", len(resp['LoadBalancers']), len(elbs))
+        # print("\t+get_elbv2", len(resp['LoadBalancers']), len(elbs))
         full_resp.extend(elbs)
 
         # if resp['ResponseMetadata']['RetryAttempts'] > 0:
@@ -135,14 +135,14 @@ def get_elbv2(vpc_list):
 def get_listeners(balv2_rep):
     full_resp = {}
     throttle = False
-    print("Listeners")
+    # print("Listeners")
     for lb in balv2_rep:
         paginator = elbv2_client.get_paginator("describe_listeners")
         response_iterator = paginator.paginate(LoadBalancerArn=lb['LoadBalancerArn'])
         # resp = elbv2_client.describe_listeners(LoadBalancerArn=lb['LoadBalancerArn'])
         for resp in response_iterator:
 
-            print("\t", lb['LoadBalancerName'], len(resp['Listeners']))
+            # print("\t", lb['LoadBalancerName'], len(resp['Listeners']))
             full_resp[lb['LoadBalancerArn']] = resp['Listeners']
 
             if resp.get('ResponseMetadata', {}).get('RetryAttempts', 0) > 0:
@@ -152,7 +152,7 @@ def get_listeners(balv2_rep):
             if throttle:
                 time.sleep(0.2)
 
-    print("listeners", len(full_resp))
+    print("Listeners", len(full_resp))
     return full_resp
 
 # describe_target_groups
@@ -184,12 +184,12 @@ def get_target_health(targ_groups_rep):
     full_resp = {}
     throttle = False
     tgl = [y['TargetGroupArn'] for x in targ_groups_rep for y in targ_groups_rep[x]]
-    print("tdescribe_target_health")
+    # print("describe_target_health")
     for t in tgl:
         # no response_iterator for describe_target_health
         resp = elbv2_client.describe_target_health(TargetGroupArn=t)
 
-        print("\t", t, len(resp['TargetHealthDescriptions']))
+        # print("\t", t, len(resp['TargetHealthDescriptions']))
         full_resp[t] = resp['TargetHealthDescriptions']
 
         if resp.get('ResponseMetadata', {}).get('RetryAttempts', 0) > 0:
@@ -200,6 +200,24 @@ def get_target_health(targ_groups_rep):
             time.sleep(0.2)
 
     #print("target_group", len(full_resp))
+    return full_resp
+
+def get_elbv2_tags(arns):
+    full_resp = []
+    throttle = False
+    paginator = elbv2_client.get_paginator("describe_tags")
+    response_iterator = paginator.paginate(ResourceArns=arns)
+    for resp in response_iterator:
+
+        full_resp.extend(resp["TagDescriptions"])
+
+        if resp.get('ResponseMetadata', {}).get('RetryAttempts', 0) > 0:
+            print("\tRetryAttempts:", resp['ResponseMetadata'].get('RetryAttempts', '?'))
+            throttle = True
+
+        if throttle:
+            time.sleep(0.2)
+
     return full_resp
 
 # describe_instances
@@ -227,6 +245,25 @@ def get_instances(ffilter=None):
 
     return full_resp
 
+# 
+# describe_workspaces
+def get_workspaces_resource(func, index):
+    # ffilter = ffilter or []
+    full_resp = []
+    throttle = False
+    paginator = workspaces_client.get_paginator(func)
+    response_iterator = paginator.paginate()
+    for resp in response_iterator:
+
+        full_resp.extend(resp[index])
+
+        if resp.get('ResponseMetadata', {}).get('RetryAttempts', 0) > 0:
+            print("\tRetryAttempts:", resp['ResponseMetadata'].get('RetryAttempts', '?'))
+            throttle = True
+        if throttle:
+            time.sleep(0.2)
+
+    return full_resp
 
 # describe_auto_scaling_instances AutoScalingInstances
 # describe_auto_scaling_groups AutoScalingGroups
@@ -253,7 +290,7 @@ def get_lambda_resource(func, index):
     full_resp = []
     throttle = False
     paginator = lambda_client.get_paginator(func)
-    response_iterator = paginator.paginate()
+    response_iterator = paginator.paginate() # MasterRegion=aws_region)
     for resp in response_iterator:
 
         full_resp.extend(resp[index])
@@ -327,6 +364,44 @@ def get_dynamodb_endpoints():
     return full_resp
 
 
+def get_elbv2_resource(func, index, ffilter=None):
+    ffilter = ffilter or []
+    full_resp = []
+    throttle = False
+    paginator = elbv2s_client.get_paginator(func)
+    response_iterator = paginator.paginate(Filters=ffilter)
+    for resp in response_iterator:
+
+        full_resp.extend(resp[index])
+
+        if resp.get('ResponseMetadata', {}).get('RetryAttempts', 0) > 0:
+            print("\tRetryAttempts:", resp['ResponseMetadata'].get('RetryAttempts', '?'))
+            throttle = True
+
+        if throttle:
+            time.sleep(0.2)
+
+    return full_resp
+
+
+def get_redshift_resource(func, index):
+    full_resp = []
+    throttle = False
+    paginator = rds_client.get_paginator(func)
+    response_iterator = paginator.paginate()
+    for resp in response_iterator:
+
+        full_resp.extend(resp[index])
+
+        if resp.get('ResponseMetadata', {}).get('RetryAttempts', 0) > 0:
+            print("\tRetryAttempts:", resp['ResponseMetadata'].get('RetryAttempts', '?'))
+            throttle = True
+
+        if throttle:
+            time.sleep(0.2)
+
+    return full_resp
+
 
 def get_rds_resource(func, index, ffilter=None):
     ffilter = ffilter or []
@@ -350,12 +425,15 @@ def get_rds_resource(func, index, ffilter=None):
 
 # describe_file_systems FileSystems
 # describe_mount_targets MountTargets
-def get_efs_resource(func, index):
+def get_efs_resource(func, index, fid=None):
     # ffilter = ffilter or []
     full_resp = []
     throttle = False
     paginator = efs_client.get_paginator(func)
-    response_iterator = paginator.paginate()   # Filters=ffilter)
+    if fid:
+        response_iterator = paginator.paginate(FileSystemId=fid)   # Filters=ffilter)
+    else:
+        response_iterator = paginator.paginate()   # Filters=ffilter)
     for resp in response_iterator:
 
         full_resp.extend(resp[index])
@@ -392,10 +470,10 @@ class JSONSetEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 def qdump(n, d):
-    fname = "{}/{}.json".format(dirn, n)
+    fname = f"{dirn}/{n}.json"
     # fname = "{}/{}_{}.json".format(filen, n, logGroup)
     print("Save", fname)
-    with open(fname, 'w') as qfd:
+    with open(fname, 'w', encoding="utf8") as qfd:
         json.dump(d, qfd, cls=JSONSetEncoder, sort_keys=True, indent=4, separators=(',', ': '))
 
 def write_events(efd, event):
@@ -504,7 +582,7 @@ def get_flowlog_streams(log_grp=None):    # pylint: disable=too-many-locals, too
         if log_duration:
             kargs['startTime'] = startTime
 
-        with open(filen, 'w') as fd:
+        with open(filen, 'w', encoding="utf8") as fd:
 
             line_count = 0
             nextTok = True
@@ -551,8 +629,7 @@ def get_flowlog_streams(log_grp=None):    # pylint: disable=too-many-locals, too
                     lts = lev.get('timestamp', 1000)
                     ltm = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(lts/1000))
                     ts_diff = (lts - sts) / 60000.0
-                    print("\tlast  tm = {} {} {:0.3f} min".format(
-                        lts, ltm, ts_diff))
+                    print(f"\tlast  tm = {lts} {ltm} {ts_diff:0.3f} min")
 
                 # print('\tnextBackwardToken', log_events['nextBackwardToken'])
                 # print('\tcurrTok          ', currTok)
@@ -566,7 +643,7 @@ def get_flowlog_streams(log_grp=None):    # pylint: disable=too-many-locals, too
                 # print('m s', m, s)
                 h, m = divmod(m, 60)
                 # print('h m', h, m)
-                print("\t{:d}:{:02d}:{:02d}".format(h, m, s))
+                print(f"\t{h:d}:{m:02d}:{s:02d}")
             if line_count == 0:
                 print("\tWritten Lines", line_count)
                 # os.remove(filen)
@@ -599,7 +676,7 @@ if __name__ == '__main__':
 
     if not os.path.isdir("FlowLogs"):
         os.mkdir("FlowLogs")
-    dirn = "FlowLogs/{}".format(LogDir)
+    dirn = f"FlowLogs/{LogDir}"
     if not os.path.isdir(dirn):
         os.mkdir(dirn)
 
@@ -612,7 +689,7 @@ if __name__ == '__main__':
         os.symlink(LogDir, x)
 
 
-    with open(f"{dirn}/info.txt", 'w') as ffd:
+    with open(f"{dirn}/info.txt", 'w', encoding="utf8") as ffd:
         print(f"Account: {acct}", file=ffd)
         print(f"Account Alias: {acctname}", file=ffd)
         print(time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(mytime)), "GMT", file=ffd)
@@ -622,17 +699,22 @@ if __name__ == '__main__':
     # create Sessions
     log_client = session.client('logs', config=boto_config)
     ec2_client = session.client('ec2', config=boto_config)
+    ecs_client = session.client('ecs', config=boto_config)
     elbv2_client = session.client('elbv2', config=boto_config)
     elb_client = session.client('elb', config=boto_config)
     asg_client = session.client('autoscaling', config=boto_config)
     rds_client = session.client('rds', config=boto_config)
-    lambda_client = session.client('lambda', config=boto_config)
+    # lambda_client = session.client('lambda', config=boto_config)
+    lambda_client = None
     elasticache_client = session.client('elasticache', config=boto_config)
-    # efs_client = session.client('efs', config=boto_config)
-    efs_client = None
-    # dynamodb_client = session.client('dynamodb', config=boto_config)
-    dynamodb_client = None
-
+    efs_client = session.client('efs', config=boto_config)
+    # efs_client = None
+    dynamodb_client = session.client('dynamodb', config=boto_config)
+    # dynamodb_client = None
+    # workspaces_client = session.client('workspaces', config=boto_config)
+    workspaces_client = None
+    # redshift_client = session.client('redshift', config=boto_config)
+    redshift_client = None
 
     print("\nVpcs")
     if aws_vpc is None or no_vpc_filter:
@@ -646,6 +728,10 @@ if __name__ == '__main__':
         if len(vpc_rep) == 1:
             aws_vpc = vpc_rep[0]['VpcId']
             print("Using VpcId", aws_vpc)
+
+        aws_vpc_list = [v['VpcId'] for v in vpc_rep]
+    else:
+        aws_vpc_list = [aws_vpc]
 
 
     print("\nNetwork Interfaces")
@@ -695,6 +781,12 @@ if __name__ == '__main__':
     print("TransitGateways", len(transit_gateways_rep))
     qdump('transit_gateways', transit_gateways_rep)
 
+    print("\nEc2 describe_tags")
+    ec2_describe_tags_rep = get_ec2_resource("describe_tags", "Tags")  # vpc_filter
+    print("Tags", len(ec2_describe_tags_rep))
+    qdump('ec2_describe_tags', ec2_describe_tags_rep)
+
+
     if dynamodb_client:
         print("\nDynamodb Endpoints")
         dynamodb_endpoints_rep = get_dynamodb_endpoints()
@@ -713,18 +805,91 @@ if __name__ == '__main__':
     qdump('local_gateway_virtual_interfaces', local_gateway_virtual_interfaces_rep)
 
 
+    print(f"aws_vpc={aws_vpc}")
+    print(f"aws_vpc_list={aws_vpc_list}")
+
     print("\nlambda-functions")
-    lambda_funct_rep = get_lambda_resource("list_functions", "Functions")
-    # if vpc_id:
-    #     lambda_funct_rep = [l for l in lambda_funct_rep if lb['VpcConfig']['VpcId'] == vpc_id]
-    print("lambda-functions", len(lambda_funct_rep))
-    qdump('lambda_functions', lambda_funct_rep)
+    lambda_functions_rep=[]
+    if lambda_client:
+        lambda_funct_rep = get_lambda_resource("list_functions", "Functions")
+        # if vpc_id:
+        #     lambda_funct_rep = [l for l in lambda_funct_rep if lb['VpcConfig']['VpcId'] == vpc_id]
+
+        print("lambda-functions_rep", len(lambda_funct_rep))
+        for la in lambda_funct_rep:
+            if 'VpcConfig' not in la:
+                continue
+            try:
+                lam_vpc = la['VpcConfig']['VpcId']
+            except KeyError as _e:
+                print(_e)
+                pprint.pprint(la)
+                sys.exit()
+            if lam_vpc in aws_vpc_list:
+                lambda_functions_rep.append(la)
+    print("lambda-functions", len(lambda_functions_rep))
+    qdump('lambda_functions', lambda_functions_rep)
+
+    print("\nlambda-functions tags")
+    lambda_tags = {}
+    for lf in lambda_functions_rep:
+        rtarg = lf['FunctionArn']
+        lf_list = lambda_client.list_tags(Resource=rtarg)
+        lambda_tags[rtarg] = lf_list.get("Tags", [])
+    qdump('lambda_tags', lambda_tags)
 
     print("\nEc2 Instances")
-    instances_rep = get_instances(vpc_filter)
-    # instances_rep = ec2_client.describe_instances(Filters=vpc_filter)
-    print('instances_rep', len(instances_rep))
-    qdump('instances', instances_rep)
+    ec2_instances_rep = get_instances(vpc_filter)
+    # ec2_instances_rep = ec2_client.describe_instances(Filters=vpc_filter)
+    print('ec2_instances_rep', len(ec2_instances_rep))
+    qdump('ec2_instances', ec2_instances_rep)
+
+    ecs_clusters_rep = []
+    if ecs_client:
+        print('get ecs_clusters')
+        paginator = ecs_client.get_paginator('list_clusters')
+
+        response_iterator = paginator.paginate(PaginationConfig={'PageSize':50})
+        for each_page in response_iterator:
+            clusterArns = each_page['clusterArns']
+            print(f"clusterArns = {len(clusterArns)}")
+            ecs_response = ecs_client.describe_clusters(clusters=clusterArns, include=['TAGS'])
+            ecs_clusters_rep.extend(ecs_response.get('clusters', []))
+    else:
+        print('skip ecs_clusters')
+    print('ecs_clusters_rep', len(ecs_clusters_rep))
+    qdump('ecs_clusters', ecs_clusters_rep)
+
+
+    if redshift_client:
+        print("\Redshift")
+        # redshift_clusters_rep = get_redshift_resource("describe_clusters", "Clusters")
+        redshift_clusters_rep = redshift_client.describe_clusters().get("Clusters", [])
+        print('redshift_clusters_rep', len(redshift_clusters_rep))
+        qdump('redshift_clusters', redshift_clusters_rep)
+
+        print("\Redshift Tags")
+        # get_redshift_resource("describe_tags", "TaggedResources")
+        redshift_tags_rep = redshift_client.describe_tags().get("TaggedResources", [])
+        print('redshift_tags_rep', len(redshift_tags_rep))
+        qdump('redshift_tags', redshift_tags_rep)
+    else:
+        print('skip Redshift')
+
+    if workspaces_client:
+        print("\nWorkspaces")
+        workspaces_rep = get_workspaces_resource("describe_workspaces", "Workspaces")
+        print('workspaces_rep', len(workspaces_rep))
+        qdump('workspaces_rep', workspaces_rep)
+
+        workspaces_tags = {}
+        for ws in workspaces_rep:
+            WsID = ws['WorkspaceIds']
+            ws_tag_list = efs_client.list_tags_for_resource(ResourceId=WsID)
+            workspaces_tags[WsID] = ws_tag_list.get("Tags", [])
+        qdump('workspaces_tags', workspaces_tags)
+    else:
+        print('skip Workspaces')
 
     if efs_client:
         print("\nEFS FileSystems")
@@ -732,13 +897,22 @@ if __name__ == '__main__':
         print('efs_filesystems_rep', len(efs_filesystems_rep))
         qdump('efs_filesystems', efs_filesystems_rep)
 
-        print("\nEFS MountTargets")
-        efs_mounttargets_rep = get_efs_resource("describe_file_systems", "MountTargets")
-        print('efs_mounttargets_rep', len(efs_mounttargets_rep))
-        qdump('efs_mountTargets', efs_mounttargets_rep)
+        if efs_filesystems_rep:
+            print("\nEFS MountTargets")
+            for mt in efs_filesystems_rep:
+                efs_mounttargets_rep = get_efs_resource("describe_mount_targets", "MountTargets",
+                    fid=mt['FileSystemId'])
+            print('efs_mounttargets_rep', len(efs_mounttargets_rep))
+            qdump('efs_mountTargets', efs_mounttargets_rep)
 
-        # for MountTargetId in MountTargets
-        # EFS list_tags_for_resource  ResourceId
+        efs_tags = {}
+        for mt in efs_filesystems_rep:
+            FsID = mt['FileSystemId']
+            fs_tag_list = efs_client.list_tags_for_resource(FileSystemId=FsID)
+            efs_tags[FsID] = fs_tag_list.get("Tags", [])
+        qdump('efs_mountTargets_tags', efs_tags)
+    else:
+        print('skip EFS FileSystems')
 
     if rds_client:
         print("\nRds Instances")
@@ -751,6 +925,14 @@ if __name__ == '__main__':
         print('rds_cluster_endpoints', len(rds_cluster_endpoints_rep))
         qdump('rds_cluster_endpoints', rds_cluster_endpoints_rep)
 
+        rds_tags = {}
+        for db in rds_instances_rep:
+            ttarg = db['DBInstanceIdentifier']
+            t_list = rds_client.list_tags_for_resource(ResourceId=ttarg)
+            rds_tags[ttarg] = t_list.get("Tags", [])
+        qdump('rds_instances_tags', rds_tags)
+    else:
+        print('skip RDS')
 
     if elasticache_client:
         print("\nElasticache cache_clusters")
@@ -758,10 +940,24 @@ if __name__ == '__main__':
         print('elasticache_cache_clusters', len(elasticache_cache_clusters_rep))
         qdump('elasticache_cache_clusters', elasticache_cache_clusters_rep)
 
+        el_tags = {}
+        for et in elasticache_cache_clusters_rep:
+            etarg = et['CacheClusterId']
+            el_list = elasticache_client.list_tags_for_resource(ResourceName=etarg)
+            el_tags[mtarg] = el_list.get("Tags", [])
+        qdump('elasticache_cache_clusters_tags', el_tags)
+    else:
+        print('skip Elasticache')
+
     print("\nASG Instances")
     asg_instances_rep = get_asg_resource("describe_auto_scaling_instances", "AutoScalingInstances")
     print('asg_instances_rep', len(asg_instances_rep))
     qdump('auto_scaling_instances', asg_instances_rep)
+
+    print("\nASG Tags")
+    asg_tags_rep = get_asg_resource("describe_tags", "Tags")
+    print('asg_tags_rep', len(asg_tags_rep))
+    qdump('auto_scaling_tags', asg_tags_rep)
 
     print("\nASG")
     asg_rep = get_asg_resource("describe_auto_scaling_groups", "AutoScalingGroups")
@@ -771,7 +967,7 @@ if __name__ == '__main__':
     if no_vpc_filter:
         elb_filter = []
     else:
-        elb_filter = [aws_vpc]
+        elb_filter = aws_vpc_list
 
     print("\nElbv2")
     load_balv2_rep = get_elbv2(elb_filter)
@@ -782,6 +978,15 @@ if __name__ == '__main__':
     load_bal_rep = get_elb(elb_filter)
     print('load_bal_rep', len(load_bal_rep))
     qdump('elb', load_bal_rep)
+
+    if load_bal_rep:
+        print("\nElb describe_tags")
+        arn_list = []
+        arn_list.extend([x['LoadBalancerName'] for x in load_bal_rep])
+        elb_describe_tags_rep = elb_client.describe_tags(LoadBalancerNames=arn_list).get('TagDescriptions', [])
+        print("Elb Tags", len(elb_describe_tags_rep))
+        qdump('elb_describe_tags', elb_describe_tags_rep)
+
 
     if load_balv2_rep:
         print("\nTarget Groups")
@@ -807,6 +1012,15 @@ if __name__ == '__main__':
         listeners_rep = {}
     qdump('listeners', listeners_rep)
 
+    print("\nElbv2 describe_tags")
+    arn_list = []
+    arn_list.extend([x['LoadBalancerArn'] for x in load_balv2_rep])
+    arn_list.extend([y['ListenerArn'] for x in listeners_rep.values() for y in x])
+    arn_list.extend([y['TargetGroupArn'] for x in target_groups_rep.values() for y in x])
+
+    elbv2_describe_tags_rep = elbv2_client.describe_tags(ResourceArns=arn_list)
+    print("Elbv2 Tags", len(elbv2_describe_tags_rep))
+    qdump('elbv2_describe_tags', elbv2_describe_tags_rep)
 
 # may be broke after this point
 
